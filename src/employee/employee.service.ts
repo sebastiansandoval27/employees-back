@@ -53,13 +53,16 @@ export class EmployeeService {
               // Update the existing employeeHierarchy record
               return prisma.employeeHierarchy.update({
                 where: { id: sub.id },
-                data: { manager_id: Number(newManagerId) },
+                data: {
+                  manager_id: Number(newManagerId),
+                  version: { increment: 1 },
+                },
               });
             } else {
               // Remove the manager_id for the specified employee
               return prisma.employeeHierarchy.update({
                 where: { id: sub.id },
-                data: { manager_id: null },
+                data: { manager_id: null, version: { increment: 1 } },
               });
             }
           }),
@@ -84,9 +87,7 @@ export class EmployeeService {
           data: { role: 'EMPLOYEE', version: { increment: 1 } },
         });
 
-        console.log({ newManager, currentSubordinates });
-
-        return { message: 'WORKS' };
+        return { success: true };
       });
     } catch (error) {
       console.log(error);
