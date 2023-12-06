@@ -1,0 +1,34 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmployeeRole {
+  EMPLOYEE
+  MANAGER
+}
+
+model Employee {
+  id                Int                 @id @default(autoincrement())
+  name              String
+  version           Int
+  role              EmployeeRole        @default(EMPLOYEE)
+  employeeHierarchy EmployeeHierarchy[] @relation("EmployeeRelations")
+  managerHierarchy  EmployeeHierarchy[] @relation("ManagerRelations")
+}
+
+model EmployeeHierarchy {
+  id          Int       @id @default(autoincrement())
+  version     Int
+  employee    Employee  @relation("EmployeeRelations", fields: [employee_id], references: [id])
+  employee_id Int
+  manager     Employee? @relation("ManagerRelations", fields: [manager_id], references: [id])
+  manager_id  Int?
+}
