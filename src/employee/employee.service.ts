@@ -21,13 +21,23 @@ export class EmployeeService {
     try {
       return await this.prisma.employee.findMany({
         include: {
-          employeeHierarchy: {},
+          employeeHierarchy: {
+            orderBy: {
+              id: 'asc',
+            },
+          },
           managerHierarchy: {
+            orderBy: {
+              id: 'asc',
+            },
             include: {
               employee: {},
               manager: {},
             },
           },
+        },
+        orderBy: {
+          id: 'asc',
         },
       });
     } catch (error) {
@@ -113,64 +123,69 @@ export class EmployeeService {
    */
   async updateManager(newManagerId: number) {
     try {
-      return await this.prisma.$transaction(async (prisma) => {
-        // Get the employee record
-        const newManager = await this.getNewManagerEmployee(
-          this.prisma,
-          newManagerId,
-        );
+      return await this.prisma.$transaction(
+        async (prisma) => {
+          // Get the employee record
+          const newManager = await this.getNewManagerEmployee(
+            this.prisma,
+            newManagerId,
+          );
 
-        // Get the current manager record
-        const currentManager = await this.getCurrentManagerRecord(
-          this.prisma,
-          newManager?.employeeHierarchy[0]?.manager_id,
-        );
+          // Get the current manager record
+          const currentManager = await this.getCurrentManagerRecord(
+            this.prisma,
+            newManager?.employeeHierarchy[0]?.manager_id,
+          );
 
-        // Get the current manager's subordinates
-        const currentSubordinates = await prisma.employeeHierarchy.findMany({
-          where: {
-            manager_id: Number(newManager?.employeeHierarchy[0]?.manager_id),
-          },
-        });
+          // Get the current manager's subordinates
+          const currentSubordinates = await prisma.employeeHierarchy.findMany({
+            where: {
+              manager_id: Number(newManager?.employeeHierarchy[0]?.manager_id),
+            },
+          });
 
-        // Update the employeeHierarchy records for the current manager's subordinates
-        await Promise.all(
-          currentSubordinates.map(async (sub) => {
-            if (sub.employee_id !== Number(newManagerId)) {
-              // Update the existing employeeHierarchy record
-              return prisma.employeeHierarchy.update({
-                where: { id: sub.id },
-                data: {
-                  manager_id: Number(newManagerId),
-                  version: { increment: 1 },
-                },
-              });
-            } else {
-              // Remove the manager_id for the specified employee
-              return prisma.employeeHierarchy.update({
-                where: { id: sub.id },
-                data: { manager_id: null, version: { increment: 1 } },
-              });
-            }
-          }),
-        );
+          // Update the employeeHierarchy records for the current manager's subordinates
+          await Promise.all(
+            currentSubordinates.map(async (sub) => {
+              if (sub.employee_id !== Number(newManagerId)) {
+                // Update the existing employeeHierarchy record
+                return prisma.employeeHierarchy.update({
+                  where: { id: sub.id },
+                  data: {
+                    manager_id: Number(newManagerId),
+                    version: { increment: 1 },
+                  },
+                });
+              } else {
+                // Remove the manager_id for the specified employee
+                return prisma.employeeHierarchy.update({
+                  where: { id: sub.id },
+                  data: { manager_id: null, version: { increment: 1 } },
+                });
+              }
+            }),
+          );
 
-        // Update the employeeHierarchy record for the new manager
-        await this.updateManyEmployees(
-          this.prisma,
-          newManagerId,
-          currentManager?.id,
-        );
+          // Update the employeeHierarchy record for the new manager
+          await this.updateManyEmployees(
+            this.prisma,
+            newManagerId,
+            currentManager?.id,
+          );
 
-        // Update the employee record
-        await this.updateEmployee(
-          this.prisma,
-          newManagerId,
-          currentManager?.id,
-        );
+          // Update the employee record
+          await this.updateEmployee(
+            this.prisma,
+            newManagerId,
+            currentManager?.id,
+          );
 
-        return { success: true };
-      });
+          return { success: true };
+        },
+        {
+          timeout: 10000,
+        },
+      );
     } catch (error) {
       console.log(error);
       return { success: false, error: error.message };
